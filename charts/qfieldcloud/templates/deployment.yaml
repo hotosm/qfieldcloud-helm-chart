@@ -96,23 +96,6 @@ spec:
               value: {{ .Values.geodatabase.name | quote }}
             - name: ACCOUNT_EMAIL_VERIFICATION
               value: {{ .Values.django.settings.accountEmailVerification | quote }}
-            - name: EMAIL_HOST
-              value: {{ .Values.django.email.host | quote }}
-            - name: EMAIL_USE_TLS
-              value: {{ .Values.django.email.useTls | quote }}
-            - name: EMAIL_USE_SSL
-              value: {{ .Values.django.email.useSsl | quote }}
-            - name: EMAIL_PORT
-              value: {{ .Values.django.email.port | quote }}
-            - name: EMAIL_HOST_USER
-              value: {{ .Values.django.email.hostUser | quote }}
-            - name: EMAIL_HOST_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "qfieldcloud.fullname" . }}-email
-                  key: password
-            - name: DEFAULT_FROM_EMAIL
-              value: {{ .Values.django.email.defaultFromEmail | quote }}
             - name: QFIELDCLOUD_SUBSCRIPTION_MODEL
               value: {{ .Values.django.settings.subscriptionModel | quote }}
             - name: QFIELDCLOUD_AUTH_TOKEN_EXPIRATION_HOURS
@@ -125,6 +108,15 @@ spec:
               value: {{ .Values.django.settings.defaultTimeZone | quote }}
             - name: QFIELDCLOUD_QGIS_IMAGE_NAME
               value: {{ .Values.qgis.image.repository }}:{{ .Values.qgis.image.tag }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+
+            {{- range $key, $value := .Values.worker.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

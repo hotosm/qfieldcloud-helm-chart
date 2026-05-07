@@ -10,6 +10,10 @@ keywords:
   - qfield
   - cloud
   - gis
+dependencies:
+  - name: rustfs
+    version: 0.0.99
+    repository: https://charts.rustfs.com/
 home: https://github.com/opengisch/qfieldcloud
 sources:
   - https://github.com/opengisch/qfieldcloud 
