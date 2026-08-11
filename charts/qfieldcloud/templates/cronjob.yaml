@@ -55,7 +55,7 @@ spec:
                 - name: POSTGRES_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: {{ include "qfieldcloud.fullname" . }}-database
+                      name: qfieldcloud-postgresql
                       key: password
                 - name: POSTGRES_HOST
                   value: {{ .Values.database.host | quote }}
