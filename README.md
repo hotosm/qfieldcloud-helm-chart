@@ -13,8 +13,7 @@ helm repo update
 
 - Kubernetes 1.19+
 - Helm 3.2.0+
-- PostgreSQL database (external)
-- PostGIS-enabled PostgreSQL database (external)
+- PostgreSQL database (bundled for development, external for production)
 
 ## Installing the Chart
 
@@ -44,7 +43,7 @@ This Helm chart follows Kubernetes best practices and includes the following com
 4. **Memcached**: For caching
 5. **Transformation Grids**: Downloaded as an init container and stored in a persistent volume
 
-The chart is designed to work with external databases (PostgreSQL and PostGIS) rather than deploying them as part of the chart, following the separation of concerns principle.
+The chart bundles PostgreSQL for development convenience. For production, set `postgresql.enabled=false` and point `database.*` at a managed instance.
 
 ## Parameters
 
@@ -114,24 +113,15 @@ The chart is designed to work with external databases (PostgreSQL and PostGIS) r
 
 | Name                           | Description                                                                               | Value           |
 |--------------------------------|-------------------------------------------------------------------------------------------|-----------------|
-| `database.external`            | Use external database                                                                     | `true`          |
-| `database.host`                | Database host                                                                             | `""`            |
+| `postgresql.enabled`           | Deploy the bundled PostgreSQL subchart (development only)                                  | `true`          |
+| `database.host`                | Database host (required when `postgresql.enabled=false`)                                   | `""`            |
 | `database.port`                | Database port                                                                             | `5432`          |
 | `database.name`                | Database name                                                                             | `qfieldcloud`   |
 | `database.user`                | Database user                                                                             | `qfieldcloud`   |
-| `database.password`            | Database password (should be provided via secret)                                         | `""`            |
+| `database.password`            | Database password                                                                         | `""`            |
+| `database.existingSecret`      | Read the password from a Secret you manage instead                                        | `""`            |
+| `database.existingSecretKey`   | Key within `database.existingSecret`                                                      | `password`      |
 | `database.sslMode`             | Database SSL mode                                                                         | `prefer`        |
-
-### Geodatabase parameters
-
-| Name                           | Description                                                                               | Value           |
-|--------------------------------|-------------------------------------------------------------------------------------------|-----------------|
-| `geodatabase.external`         | Use external geodatabase                                                                  | `true`          |
-| `geodatabase.host`             | Geodatabase host                                                                          | `""`            |
-| `geodatabase.port`             | Geodatabase port                                                                          | `5432`          |
-| `geodatabase.name`             | Geodatabase name                                                                          | `qfieldcloud_geodb` |
-| `geodatabase.user`             | Geodatabase user                                                                          | `qfieldcloud`   |
-| `geodatabase.password`         | Geodatabase password (should be provided via secret)                                      | `""`            |
 
 ### QGIS parameters
 
@@ -230,20 +220,15 @@ helm install qfieldcloud qfieldcloud/qfieldcloud
 helm install qfieldcloud qfieldcloud/qfieldcloud --set django.settings.environment=production
 ```
 
-### Installation with external databases
+### Installation with an external database
 
 ```bash
 helm install qfieldcloud qfieldcloud/qfieldcloud \
-  --set database.external=true \
+  --set postgresql.enabled=false \
   --set database.host=my-postgres-host \
   --set database.name=qfieldcloud \
   --set database.user=qfieldcloud \
-  --set database.password=my-secret-password \
-  --set geodatabase.external=true \
-  --set geodatabase.host=my-postgis-host \
-  --set geodatabase.name=qfieldcloud_geodb \
-  --set geodatabase.user=qfieldcloud \
-  --set geodatabase.password=my-secret-password
+  --set database.password=my-secret-password
 ```
 
 ### Installation with ingress
