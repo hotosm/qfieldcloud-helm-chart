@@ -23,14 +23,20 @@ spec:
 
       containers:
         - name: migrate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.image) | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
 
           command:
-            - python
-            - manage.py
-            - migrate
-            - --noinput
+            - /bin/bash
+            - -c
+            - |
+              set -e
+              python manage.py migrate --noinput
+              {{- if .Values.django.superuser.enabled }}
+              # Exits non-zero if the account exists, so stay idempotent.
+              python manage.py createsuperuser --noinput \
+                || echo "superuser {{ .Values.django.superuser.username }} already exists, skipping"
+              {{- end }}
 
           env:
             {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}

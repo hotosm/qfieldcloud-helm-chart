@@ -1,4 +1,5 @@
 {{- if .Values.worker.enabled -}}
+{{- $grids := .Values.persistence.transformationGrids -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -15,26 +16,34 @@ spec:
       app.kubernetes.io/component: worker
   template:
     metadata:
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
       labels:
         {{- include "qfieldcloud.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: worker
     spec:
       serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+      {{- if $grids.downloadOnStartup }}
       initContainers:
         - name: download-transformation-grids
-          image: k3rnelpan1c/alpine-wget:latest
-          command: 
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" $grids.image) | quote }}
+          imagePullPolicy: {{ $grids.image.pullPolicy }}
+          command:
             - /bin/sh
             - -c
             - |
-              wget --mirror {{ .Values.qgis.transformationGrids.sourceUrl }} -P /transformation_grids --no-host-directories
+              set -e
+              # Alpine's busybox wget has no --mirror, so pull in GNU wget.
+              command -v wget >/dev/null 2>&1 || apk add --no-cache wget
+              wget --mirror {{ $grids.sourceUrl | quote }} -P /transformation_grids --no-host-directories
               chmod a+r /transformation_grids/*
           volumeMounts:
             - name: transformation-grids
               mountPath: /transformation_grids
+      {{- end }}
       containers:
         - name: worker
-          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.worker.image) | quote }}
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           command:
             - python
@@ -44,7 +53,7 @@ spec:
             {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}
           volumeMounts:
             - name: shared-data
-              mountPath: /io
+              mountPath: {{ .Values.persistence.shared.mountPath }}
             - name: transformation-grids
               mountPath: /transformation_grids
           resources:
@@ -52,18 +61,12 @@ spec:
       volumes:
         - name: shared-data
           persistentVolumeClaim:
-            claimName: {{ .Values.env.QFC_SHARED_PVC_NAME | quote }}
+            claimName: {{ include "qfieldcloud.sharedPvcName" . }}
+        {{- if not $grids.enabled }}
+        {{- /* Must stay exclusive with volumeClaimTemplates, which would override it. */}}
         - name: transformation-grids
-          {{- if .Values.persistence.transformationGrids.enabled }}
-          persistentVolumeClaim:
-            claimName: transformation-grids-{{ .Release.Name }}-worker-$(POD_NAME)
-          {{- else }}
           emptyDir: {}
-          {{- end }}
-        #- name: docker-socket
-        #  hostPath:
-        #    path: /var/run/docker.sock
-        #    type: Socket
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -76,15 +79,18 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  {{- if $grids.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: transformation-grids
       spec:
-        accessModes: [ "ReadWriteOnce" ]
-        {{- if .Values.persistence.transformationGrids.storageClass }}
-        storageClassName: {{ .Values.persistence.transformationGrids.storageClass | quote }}
+        accessModes:
+          - {{ $grids.accessMode }}
+        {{- if $grids.storageClass }}
+        storageClassName: {{ $grids.storageClass | quote }}
         {{- end }}
         resources:
           requests:
-            storage: {{ .Values.persistence.transformationGrids.size | quote }}
-{{- end }} 
+            storage: {{ $grids.size | quote }}
+  {{- end }}
+{{- end }}

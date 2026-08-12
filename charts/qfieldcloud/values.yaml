@@ -1,17 +1,15 @@
 # Default values for qfieldcloud
 replicaCount: 1
 
+# Empty tags default to .Chart.AppVersion, pinning app/worker/cron/QGIS together.
 image:
   repository: opengisch/qfieldcloud-app
-  tag: latest
-  #repository: qfieldcloud-local
-  #tag: runtime-dev
+  tag: ""
   pullPolicy: IfNotPresent
 
 nameOverride: ""
 fullnameOverride: ""
 
-# Django application configuration
 django:
   gunicorn:
     timeout: 120
@@ -19,42 +17,43 @@ django:
     workers: 4
     threads: 2
   settings:
-    debug: 1
+    debug: 0
     environment: production
-    secretKey: "dev-secret-key-change-me-1234567890"  # Should be provided via secret
+    # Leave empty to generate a random value, retained across upgrades.
+    secretKey: ""
+    # Encrypted-model-field key: changing it makes existing encrypted values undecryptable.
+    # Set explicitly when adopting this chart on a database that already has data.
+    saltKey: ""
+    # "*" is required for kubelet probes, which address pods by IP.
     allowedHosts: "*"
     settingsModule: "qfieldcloud.settings"
-    accountEmailVerification: "none"
+    accountEmailVerification: "mandatory"
     useXForwardedHost: "0"
     useI18n: 1
     defaultLanguage: "en"
     defaultTimeZone: "UTC"
     authTokenExpirationHours: 24
-    passwordLoginDisabled: false
     subscriptionModel: "subscription.Subscription"
-    workerQfieldcloudUrl: "http://qfieldcloud:8000/api/v1/"  # URL used by worker to communicate with the main app
+
+  # Created by the migration job, idempotently.
+  superuser:
+    enabled: false
+    username: "admin"
+    email: ""
+    # Empty generates one: kubectl get secret <release>-django -o jsonpath='{.data.superuser-password}' | base64 -d
+    password: ""
+
   sentry:
     dsn: ""
     release: ""
     sampleRate: 0.1
-  email:
-    host: ""
-    useTls: true
-    useSsl: false
-    port: 587
-    hostUser: ""
-    hostPassword: ""  # Should be provided via secret
-    defaultFromEmail: "noreply@example.com"
+
   storage:
-    type: "s3"  # local, s3, etc.
-    accessKeyId: "rustfsadmin"  # Default from env.example
-    secretAccessKey: "rustfsadmin"  # Default from env.example
-    bucketName: "qfieldcloud-local"  # Default from env.example
-    regionName: "us-east-1"  # Empty by default as in env.example
-    endpoint_url: "http://qfieldcloud-rustfs-svc:9000"  # Default from env.example
-    projectDefaultStorage: "default"  # Should match the storage backend name in STORAGES
-    minioApiPort: 8009  # Default from env.example
-    minioBrowserPort: 8010  # Default from env.example
+    projectDefaultStorage: "default"
+    minioApiPort: 8009
+    minioBrowserPort: 8010
+    # Passed to Django verbatim as STORAGES; reaches containers as a plain env var
+    # visible in `kubectl describe pod`, so use a least-privilege bucket user.
     storagesConfig:
       default:
         BACKEND: "qfieldcloud.filestorage.backend.QfcS3Boto3Storage"
@@ -70,32 +69,21 @@ django:
           default_acl: "private"
         QFC_IS_LEGACY: false
 
-# Database configuration
+# Used only when postgresql.enabled is false, where these become required.
 database:
-  # External database configuration
-  external: False
-  host: "qfieldcloud-postgresql"
+  host: ""
   port: 5432
   name: "qfieldcloud"
   user: "qfieldcloud"
-  password: ""  # Should be provided via secret
+  password: ""
+  existingSecret: ""
+  existingSecretKey: "password"
   sslMode: "prefer"
 
-# Geodatabase configuration
-geodatabase:
-  # External geodatabase configuration
-  external: true
-  host: ""
-  port: 5432
-  name: "qfieldcloud_geodb"
-  user: "qfieldcloud"
-  password: ""  # Should be provided via secret
-
-# QGIS configuration
 qgis:
   image:
     repository: opengisch/qfieldcloud-qgis
-    tag: latest
+    tag: ""
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -104,23 +92,14 @@ qgis:
     requests:
       cpu: 500m
       memory: 512Mi
-  transformationGrids:
-    # If true, will download transformation grids as an init container
-    downloadOnStartup: true
-    # URL to download transformation grids from
-    sourceUrl: "https://cdn.proj.org/"
 
-# Worker configuration
 worker:
   enabled: true
   replicaCount: 1
   image:
     repository: opengisch/qfieldcloud-app
-    tag: latest
-    #repository: qfieldcloud-local
-    #tag: worker-dev
+    tag: ""
     pullPolicy: IfNotPresent
-    target: worker_wrapper_runtime  # Use the worker wrapper runtime that includes Docker client
   resources:
     limits:
       cpu: 500m
@@ -128,17 +107,16 @@ worker:
     requests:
       cpu: 250m
       memory: 256Mi
-  env:
-    #QFIELDCLOUD_HOST: "http://qfieldcloud"
-    #SALT_KEY: "test123"
-    #DJANGO_USE_X_FORWARDED_HOST: "0"
+  env: {}
 
-# Memcached configuration
 memcached:
   enabled: true
+  # qfieldcloud hardcodes "memcached:11211" with no env override, so the Service
+  # must use this exact name; only one release per namespace can own it.
+  serviceName: memcached
   image:
     repository: memcached
-    tag: "1"
+    tag: "1.6-alpine"
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -148,14 +126,11 @@ memcached:
       cpu: 50m
       memory: 64Mi
 
-# Cron jobs configuration
 cronJobs:
   enabled: true
   image:
     repository: opengisch/qfieldcloud-app
-    tag: latest
-    #repository: qfieldcloud-local
-    #tag: runtime-dev
+    tag: ""
     pullPolicy: IfNotPresent
   schedule: "@every 1m"
   resources:
@@ -166,12 +141,10 @@ cronJobs:
       cpu: 50m
       memory: 64Mi
 
-# Service configuration
 service:
   type: ClusterIP
   port: 8000
 
-# Ingress configuration
 ingress:
   enabled: true
   className: ""
@@ -183,7 +156,6 @@ ingress:
           pathType: ImplementationSpecific
   tls: []
 
-# Resource configuration
 resources:
   limits:
     cpu: "1"
@@ -192,24 +164,66 @@ resources:
     cpu: 250m
     memory: 512Mi
 
-# Pod configuration
+# Everything except `enabled` passes through to the container spec. Liveness is TCP
+# on purpose: /api/v1/status/ hits the database, so a blip would restart-loop pods.
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 6
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /api/v1/status/
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /api/v1/status/
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
 nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Persistent volume configuration
 persistence:
+  # Shared with the QGIS jobs workers spawn; ReadWriteOnce confines them to one node.
+  shared:
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: ""
+    mountPath: /io
   transformationGrids:
+    # When false, an emptyDir is used and grids re-download on restart.
     enabled: true
     size: 1Gi
     accessMode: ReadWriteOnce
-    storageClass: ""  # Use default storage class if empty
+    storageClass: ""
+    downloadOnStartup: true
+    sourceUrl: "https://cdn.proj.org/"
+    image:
+      repository: alpine
+      tag: "3.22"
+      pullPolicy: IfNotPresent
 
 serviceAccount:
   create: true
-  name: "" 
+  name: ""
 
+# Disable when using external S3, and repoint storagesConfig.
 rustfs:
+  enabled: true
   replicaCount: 1
 
   storageclass:
@@ -221,44 +235,51 @@ rustfs:
     rustfs:
       volumes: "/data"
 
+# Development only: Bitnami publishes no versioned tags, so this pulls `latest` and a
+# restart can land on a major that rejects the data dir. In production use database.*.
 postgresql:
   enabled: true
 
   auth:
     username: qfieldcloud
-    password: qfieldcloud
     database: qfieldcloud
+    # Empty means the subchart generates one and retains it across upgrades.
+    password: ""
+    existingSecret: ""
 
   primary:
     persistence:
       enabled: false
-  
-  image:
-    registry: docker.io
-    repository: bitnami/postgresql
-    tag: latest
 
+# Applied to every process. Rendered through `tpl`, so use template expressions
+# for anything release-dependent rather than hardcoding names.
 env:
-  QFIELDCLOUD_ACCOUNT_ADAPTER: "qfieldcloud.core.adapters.AccountAdapterSignUpOpen"
+  QFIELDCLOUD_ACCOUNT_ADAPTER: "qfieldcloud.core.adapters.AccountAdapterSignUpClosed"
+
+  # CHANGE ME: the public hostname clients connect to.
   QFIELDCLOUD_HOST: qfield.field.localhost
-  DJANGO_SUPERUSER_USERNAME: admin
-  DJANGO_SUPERUSER_EMAIL: sysadmin@hotosm.org
-  DJANGO_SUPERUSER_PASSWORD: ${QFIELDCLOUD_ADMIN_PASSWORD}
-  QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: "http://qfieldcloud:8000/api/v1/"
-  QFIELDCLOUD_QGIS3_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
-  QFIELDCLOUD_QGIS4_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
-  QFC_K8S_NAMESPACE: "default"
+  CORS_ALLOWED_ORIGINS: "http://qfield.field.localhost,http://qfield.field.localhost:7050"
+  CORS_ALLOW_CREDENTIALS: 1
+
+  QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: 'http://{{ include "qfieldcloud.fullname" . }}:8000/api/v1/'
+  QFIELDCLOUD_QGIS3_IMAGE_NAME: 'opengisch/qfieldcloud-qgis:{{ .Values.qgis.image.tag | default .Chart.AppVersion }}'
+  QFIELDCLOUD_QGIS4_IMAGE_NAME: 'opengisch/qfieldcloud-qgis:{{ .Values.qgis.image.tag | default .Chart.AppVersion }}'
+
+  QFC_K8S_NAMESPACE: '{{ .Release.Namespace }}'
   QFC_K8S_JOB_BACKOFF_LIMIT: "0"
   QFC_K8S_JOB_TIMEOUT_SECONDS: "3600"
   QFC_K8S_CPU_REQUEST: "500m"
   QFC_K8S_CPU_LIMIT: "1000m"
   QFC_K8S_MEMORY_REQUEST: "512Mi"
   QFC_K8S_MEMORY_LIMIT: "1Gi"
-  QFC_SHARED_PVC_NAME: "qfieldcloud-shared"
-  QFC_SHARED_DIR: "/io"
-  SALT_KEY: 0123456789abcdefghijklmnopqrstuvwxyz
+  QFC_SHARED_PVC_NAME: '{{ include "qfieldcloud.sharedPvcName" . }}'
+  QFC_SHARED_DIR: '{{ .Values.persistence.shared.mountPath }}'
+  QFIELDCLOUD_TRANSFORMATION_GRIDS_VOLUME_NAME: 'transformation-grids-{{ include "qfieldcloud.fullname" . }}-worker-0'
+
   COMPOSE_PROJECT_NAME: qfieldcloud
-  QFIELDCLOUD_TRANSFORMATION_GRIDS_VOLUME_NAME: "transformation-grids-qfieldcloud-worker-0"
+  QFIELDCLOUD_PASSWORD_LOGIN_IS_ENABLED: 1
+  QFIELDCLOUD_ADMIN_URI: admin/
+
   EMAIL_HOST: mail
   EMAIL_USE_TLS: "False"
   EMAIL_USE_SSL: "False"
@@ -266,22 +287,3 @@ env:
   EMAIL_HOST_USER: ""
   EMAIL_HOST_PASSWORD: ""
   DEFAULT_FROM_EMAIL: noreply@field.localhost
-  #POSTGRES_USER: fieldtm
-  #POSTGRES_PASSWORD: fieldtm
-  #POSTGRES_DB: fieldtm
-  #POSTGRES_HOST: qfield-db
-  #POSTGRES_PORT: 5432
-  #POSTGRES_SSLMODE: prefer
-  #SECRET_KEY: YKuuTCb256dMmcg4DxpxrCafrcVvk8s3ZJrtDr9JaVAkeLiULGiemyzUTQESrzPQhiYUfn
-
-  QFIELDCLOUD_PASSWORD_LOGIN_IS_ENABLED: 1
-  QFIELDCLOUD_ADMIN_URI: admin/
-  CORS_ALLOWED_ORIGINS: "http://qfield.field.localhost,http://qfield.field.localhost:7050"
-  CORS_ALLOW_CREDENTIALS: 1
-#env:
-#  QFIELDCLOUD_HOST: "http://qfieldcloud"
-#  SALT_KEY:
-#    valueFrom:
-#      secretKeyRef:
-#        name: qfieldcloud-secrets
-#        key: SALT_KEY
