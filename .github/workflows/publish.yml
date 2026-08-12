@@ -1,0 +1,65 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  CHART_DIR: charts/qfieldcloud
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.19.0
+
+      - name: Add dependency repositories
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add rustfs https://charts.rustfs.com/
+
+      - name: Build dependencies
+        run: helm dependency build "$CHART_DIR"
+
+      - name: Lint
+        run: helm lint --strict "$CHART_DIR"
+
+      - name: Render templates
+        run: helm template test "$CHART_DIR" > /dev/null
+
+      - name: Check tag matches chart version
+        if: github.event_name == 'push'
+        run: |
+          version=$(yq '.version' "$CHART_DIR/Chart.yaml")
+          [ "${GITHUB_REF_NAME#v}" = "$version" ] || {
+            echo "::error::tag $GITHUB_REF_NAME does not match Chart.yaml version $version"
+            exit 1
+          }
+
+      - name: Package
+        run: helm package "$CHART_DIR" --destination dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chart
+          path: dist/*.tgz
+          if-no-files-found: error
+
+      # Helm appends the chart name, giving ghcr.io/<owner>/charts/qfieldcloud.
+      - name: Push to GHCR
+        if: github.event_name == 'push'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+            helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          helm push dist/*.tgz "oci://ghcr.io/$owner/charts"

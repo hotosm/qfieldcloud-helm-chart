@@ -1,10 +1,16 @@
+{{/* Scratch space shared between the workers and the QGIS Jobs they spawn. */}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: qfieldcloud-shared
+  name: {{ include "qfieldcloud.sharedPvcName" . }}
+  labels:
+    {{- include "qfieldcloud.labels" . | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    - {{ .Values.persistence.shared.accessMode }}
+  {{- if .Values.persistence.shared.storageClass }}
+  storageClassName: {{ .Values.persistence.shared.storageClass | quote }}
+  {{- end }}
   resources:
     requests:
-      storage: 1Gi
+      storage: {{ .Values.persistence.shared.size | quote }}
