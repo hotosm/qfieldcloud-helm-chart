@@ -23,6 +23,9 @@ spec:
         app.kubernetes.io/component: worker
     spec:
       serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+      securityContext:
+        supplementalGroups:
+          - 1001
       {{- if $grids.downloadOnStartup }}
       initContainers:
         - name: download-transformation-grids
@@ -56,12 +59,18 @@ spec:
               mountPath: {{ .Values.persistence.shared.mountPath }}
             - name: transformation-grids
               mountPath: /transformation_grids
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
       volumes:
         - name: shared-data
           persistentVolumeClaim:
             claimName: {{ include "qfieldcloud.sharedPvcName" . }}
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
         {{- if not $grids.enabled }}
         {{- /* Must stay exclusive with volumeClaimTemplates, which would override it. */}}
         - name: transformation-grids

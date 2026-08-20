@@ -262,6 +262,23 @@ Django environment shared by the web app, worker, cron jobs and migration job.
       name: {{ include "qfieldcloud.djangoSecretName" . }}
       key: superuser-password
 {{- end }}
+
+{{- if not .Values.geodatabase.external }}
+- name: GEODB_HOST
+  value: {{ .Values.geodatabase.host | quote }}
+- name: GEODB_PORT
+  value: {{ .Values.geodatabase.port | quote }}
+- name: GEODB_USER
+  value: {{ .Values.geodatabase.user | quote }}
+- name: GEODB_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "qfieldcloud.fullname" . }}-geodatabase
+      key: password
+- name: GEODB_DB
+  value: {{ .Values.geodatabase.name | quote }}
+{{- end }}
+
 {{- /* Run through `tpl` so values may contain template expressions. */}}
 {{- range $key, $value := .Values.env }}
 - name: {{ $key }}
