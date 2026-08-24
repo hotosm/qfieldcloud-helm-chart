@@ -251,6 +251,12 @@ Django environment shared by the web app, worker, cron jobs and migration job.
   value: {{ .Values.django.settings.useXForwardedHost | quote }}
 - name: QFIELDCLOUD_QGIS_IMAGE_NAME
   value: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.qgis.image) | quote }}
+- name: QFIELDCLOUD_WORKER_QFIELDCLOUD_URL
+  value: {{ if .Values.worker.docker.enabled }}
+    {{- .Values.worker.docker.qfieldcloudUrl | quote }}
+  {{- else }}
+    "http://qfieldcloud:8000/api/v1/"
+  {{- end }}
 {{- if .Values.django.superuser.enabled }}
 - name: DJANGO_SUPERUSER_USERNAME
   value: {{ required "django.superuser.username is required when django.superuser.enabled is true" .Values.django.superuser.username | quote }}

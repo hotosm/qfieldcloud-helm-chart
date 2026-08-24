@@ -5,11 +5,18 @@ metadata:
   labels:
     {{- include "qfieldcloud.labels" . | nindent 4 }}
 spec:
+  {{- if eq .Values.worker.executionMode "docker" }}
+  type: NodePort
+  {{- else }}
   type: {{ .Values.service.type }}
+  {{- end }}
   ports:
-    - port: {{ .Values.service.port }}
+    - name: http
+      port: {{ .Values.service.port }}
       targetPort: http
       protocol: TCP
-      name: http
+      {{- if eq .Values.worker.executionMode "docker" }}
+      nodePort: {{ .Values.worker.docker.qfieldcloudNodePort }}
+      {{- end }}
   selector:
     {{- include "qfieldcloud.selectorLabels" . | nindent 4 }} 

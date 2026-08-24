@@ -53,7 +53,17 @@ spec:
             - manage.py
             - dequeue
           env:
+            {{- if eq .Values.worker.executionMode "docker" }}
+            {{- $workerEnv := include "qfieldcloud.djangoEnv" . }}
+            {{- $workerEnv = replace "http://qfieldcloud-rustfs-svc:9000" .Values.worker.docker.storageEndpoint $workerEnv }}
+            {{- $workerEnv = replace "http://qfieldcloud:8000/api/v1/" .Values.worker.docker.qfieldcloudUrl $workerEnv }}
+            {{- $workerEnv | nindent 12 }}
+
+            - name: QFIELDCLOUD_DEFAULT_NETWORK
+              value: {{ .Values.worker.docker.network | quote }}
+            {{- else }}
             {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}
+            {{- end }}
           volumeMounts:
             - name: shared-data
               mountPath: {{ .Values.persistence.shared.mountPath }}

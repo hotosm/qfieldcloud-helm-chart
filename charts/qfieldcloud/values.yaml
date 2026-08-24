@@ -14,10 +14,10 @@ fullnameOverride: ""
 # Django application configuration
 django:
   superuser:
-    enabled: false
+    enabled: true
     username: admin
-    email: ""
-    password: ""
+    email: admin@example.com
+    password: qfieldcloud
   gunicorn:
     timeout: 120
     maxRequests: 1000
@@ -126,6 +126,18 @@ worker:
     tag: worker-docker
     pullPolicy: IfNotPresent
     target: worker_wrapper_runtime  # Use the worker wrapper runtime that includes Docker client
+  executionMode: docker  # docker | kubernetes
+  docker: #only for docker setup
+    network: kind #default ""
+    qfieldcloudNodePort: 30080
+    qfieldcloudUrl: "http://172.18.0.2:30080/api/v1/"
+
+    storageNodePort: 30900
+    storageEndpoint: "http://172.18.0.2:30900"
+    socket:
+      enabled: true
+      path: /var/run/docker.sock
+      groupId: 1001
   resources:
     limits:
       cpu: 500m
@@ -176,6 +188,7 @@ cronJobs:
 service:
   type: ClusterIP
   port: 8000
+  nodePort: 30080
 
 # Ingress configuration
 ingress:
@@ -253,6 +266,15 @@ serviceAccount:
 rustfs:
   replicaCount: 1
 
+  service:
+    type: NodePort
+    endpoint:
+      port: 9000
+      nodePort: 30900
+    console:
+      port: 9001
+      nodePort: 32001
+      
   storageclass:
     name: standard
     dataStorageSize: 1Gi
@@ -286,10 +308,7 @@ postgresql:
 env:
   QFIELDCLOUD_ACCOUNT_ADAPTER: "qfieldcloud.core.adapters.AccountAdapterSignUpOpen"
   QFIELDCLOUD_HOST: qfield.field.localhost
-  DJANGO_SUPERUSER_USERNAME: admin
-  DJANGO_SUPERUSER_EMAIL: sysadmin@hotosm.org
-  DJANGO_SUPERUSER_PASSWORD: ${QFIELDCLOUD_ADMIN_PASSWORD}
-  QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: "http://qfieldcloud:8000/api/v1/"
+  #QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: "http://qfieldcloud:8000/api/v1/"
   QFIELDCLOUD_QGIS3_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
   QFIELDCLOUD_QGIS4_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
   QFC_K8S_NAMESPACE: "default"
