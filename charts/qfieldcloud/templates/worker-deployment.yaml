@@ -69,23 +69,28 @@ spec:
               mountPath: {{ .Values.persistence.shared.mountPath }}
             - name: transformation-grids
               mountPath: /transformation_grids
+            {{- if eq .Values.worker.executionMode "docker" }}
             - name: docker-socket
-              mountPath: /var/run/docker.sock
+              mountPath: {{ .Values.worker.docker.socket.path }}
+            {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
       volumes:
         - name: shared-data
           persistentVolumeClaim:
             claimName: {{ include "qfieldcloud.sharedPvcName" . }}
+        {{- if eq .Values.worker.executionMode "docker" }}
         - name: docker-socket
           hostPath:
-            path: /var/run/docker.sock
+            path: {{ .Values.worker.docker.socket.path }}
             type: Socket
+        {{- end }}
         {{- if not $grids.enabled }}
         {{- /* Must stay exclusive with volumeClaimTemplates, which would override it. */}}
         - name: transformation-grids
           emptyDir: {}
         {{- end }}
+        
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

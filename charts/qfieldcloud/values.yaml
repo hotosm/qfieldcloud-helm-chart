@@ -319,7 +319,6 @@ env:
   QFC_K8S_MEMORY_REQUEST: "512Mi"
   QFC_K8S_MEMORY_LIMIT: "1Gi"
   QFC_SHARED_PVC_NAME: "qfieldcloud-shared"
-  QFC_SHARED_DIR: "/io"
   #SALT_KEY: 0123456789abcdefghijklmnopqrstuvwxyz
   COMPOSE_PROJECT_NAME: qfieldcloud
   QFIELDCLOUD_TRANSFORMATION_GRIDS_VOLUME_NAME: "transformation-grids-qfieldcloud-worker-0"
