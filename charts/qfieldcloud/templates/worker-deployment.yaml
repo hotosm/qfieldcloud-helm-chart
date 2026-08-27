@@ -23,9 +23,11 @@ spec:
         app.kubernetes.io/component: worker
     spec:
       serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+      {{- if eq .Values.worker.executionMode "docker" }}
       securityContext:
         supplementalGroups:
-          - 1001
+          - {{ .Values.worker.docker.socket.groupId }}
+      {{- end }}
       {{- if $grids.downloadOnStartup }}
       initContainers:
         - name: download-transformation-grids
@@ -64,6 +66,8 @@ spec:
             {{- else }}
             {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}
             {{- end }}
+            - name: QFC_WORKER_EXECUTION_MODE
+              value: {{ .Values.worker.executionMode | quote }}
           volumeMounts:
             - name: shared-data
               mountPath: {{ .Values.persistence.shared.mountPath }}

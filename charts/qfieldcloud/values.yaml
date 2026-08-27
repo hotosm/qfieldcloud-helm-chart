@@ -329,6 +329,14 @@ env:
   EMAIL_HOST_USER: ""
   EMAIL_HOST_PASSWORD: ""
   DEFAULT_FROM_EMAIL: noreply@field.localhost
+  ACCOUNT_RATE_LIMITS: >-
+    {
+      "reset_password": "20/m/ip,2/m/key",
+      "reset_password_from_key": "2/m/ip",
+      "confirm_email": "1/3m/key"
+    }
+  QFIELDCLOUD_WORKER_TIMEOUT_S: "600"
+  QFIELDCLOUD_WORKER_DEQUEUE_INTERVAL_S: "5"
   #POSTGRES_USER: fieldtm
   #POSTGRES_PASSWORD: fieldtm
   #POSTGRES_DB: fieldtm
