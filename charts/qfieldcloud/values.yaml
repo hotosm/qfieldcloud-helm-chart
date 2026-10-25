@@ -126,7 +126,7 @@ worker:
     tag: worker-docker
     pullPolicy: IfNotPresent
     target: worker_wrapper_runtime  # Use the worker wrapper runtime that includes Docker client
-  executionMode: kubernetes  # docker | kubernetes
+  executionMode: docker # docker | kubernetes
   docker: #only for docker setup
     network: kind #default ""
     qfieldcloudNodePort: 30080
@@ -313,6 +313,9 @@ env:
   #QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: "http://qfieldcloud:8000/api/v1/"
   QFIELDCLOUD_QGIS3_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
   QFIELDCLOUD_QGIS4_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
+  QFIELDCLOUD_DRF_BROWSERABLE_API_RENDERER_ENABLED: "0"
+  QFIELDCLOUD_WORKER_SDK_CONNECT_TIMEOUT_S: "10"
+  QFIELDCLOUD_WORKER_SDK_READ_TIMEOUT_S: "300"
   QFC_K8S_NAMESPACE: "default"
   QFC_K8S_JOB_BACKOFF_LIMIT: "0"
   QFC_K8S_JOB_TIMEOUT_SECONDS: "3600"
