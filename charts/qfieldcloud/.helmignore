@@ -1,0 +1,26 @@
+# Patterns to ignore when building packages.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.vscode/
+# Local / test overrides — not part of the published chart
+values-test.yaml
+values-local.yaml
+values-dev.yaml
+ci/

@@ -1,0 +1,124 @@
+{{- if .Values.worker.enabled -}}
+{{- $grids := .Values.persistence.transformationGrids -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "qfieldcloud.fullname" . }}-worker
+  labels:
+    {{- include "qfieldcloud.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  serviceName: {{ include "qfieldcloud.fullname" . }}-worker
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "qfieldcloud.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      annotations:
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+      labels:
+        {{- include "qfieldcloud.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+      {{- if eq .Values.worker.executionMode "docker" }}
+      securityContext:
+        supplementalGroups:
+          - {{ .Values.worker.docker.socket.groupId }}
+      {{- end }}
+      {{- if $grids.downloadOnStartup }}
+      initContainers:
+        - name: download-transformation-grids
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" $grids.image) | quote }}
+          imagePullPolicy: {{ $grids.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Alpine's busybox wget has no --mirror, so pull in GNU wget.
+              command -v wget >/dev/null 2>&1 || apk add --no-cache wget
+              wget --mirror {{ $grids.sourceUrl | quote }} -P /transformation_grids --no-host-directories
+              chmod a+r /transformation_grids/*
+          volumeMounts:
+            - name: transformation-grids
+              mountPath: /transformation_grids
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.worker.image) | quote }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          command:
+            - python
+            - manage.py
+            - dequeue
+          env:
+            {{- if eq .Values.worker.executionMode "docker" }}
+            {{- $workerEnv := include "qfieldcloud.djangoEnv" . }}
+            {{- $workerEnv = replace "http://qfieldcloud-rustfs-svc:9000" .Values.worker.docker.storageEndpoint $workerEnv }}
+            {{- $workerEnv = replace "http://qfieldcloud:8000/api/v1/" .Values.worker.docker.qfieldcloudUrl $workerEnv }}
+            {{- $workerEnv | nindent 12 }}
+
+            - name: QFIELDCLOUD_DEFAULT_NETWORK
+              value: {{ .Values.worker.docker.network | quote }}
+            {{- else }}
+            {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}
+            {{- end }}
+            - name: QFC_WORKER_EXECUTION_MODE
+              value: {{ .Values.worker.executionMode | quote }}
+          volumeMounts:
+            - name: shared-data
+              mountPath: {{ .Values.persistence.shared.mountPath }}
+            - name: transformation-grids
+              mountPath: /transformation_grids
+            {{- if eq .Values.worker.executionMode "docker" }}
+            - name: docker-socket
+              mountPath: {{ .Values.worker.docker.socket.path }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: {{ include "qfieldcloud.sharedPvcName" . }}
+        {{- if eq .Values.worker.executionMode "docker" }}
+        - name: docker-socket
+          hostPath:
+            path: {{ .Values.worker.docker.socket.path }}
+            type: Socket
+        {{- end }}
+        {{- if not $grids.enabled }}
+        {{- /* Must stay exclusive with volumeClaimTemplates, which would override it. */}}
+        - name: transformation-grids
+          emptyDir: {}
+        {{- end }}
+        
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if $grids.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: transformation-grids
+      spec:
+        accessModes:
+          - {{ $grids.accessMode }}
+        {{- if $grids.storageClass }}
+        storageClassName: {{ $grids.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $grids.size | quote }}
+  {{- end }}
+{{- end }}

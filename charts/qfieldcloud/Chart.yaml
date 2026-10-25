@@ -1,0 +1,24 @@
+apiVersion: v2
+name: qfieldcloud
+description: A Helm chart for QField Cloud
+type: application
+version: 0.1.0
+appVersion: "26.22"
+maintainers:
+  - name: QField Cloud Team
+keywords:
+  - qfield
+  - cloud
+  - gis
+dependencies:
+  - name: postgresql
+    version: 18.6.4
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: rustfs
+    version: 0.0.99
+    repository: https://charts.rustfs.com/
+    condition: rustfs.enabled
+home: https://github.com/opengisch/qfieldcloud
+sources:
+  - https://github.com/opengisch/qfieldcloud 

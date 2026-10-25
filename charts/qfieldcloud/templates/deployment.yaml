@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "qfieldcloud.fullname" . }}
+  labels:
+    {{- include "qfieldcloud.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "qfieldcloud.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- /* Roll the pods when secrets change, so a rotated key is picked up. */}}
+        checksum/secrets: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+      labels:
+        {{- include "qfieldcloud.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.image) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - gunicorn
+            - qfieldcloud.wsgi:application
+            - --bind
+            - 0.0.0.0:{{ .Values.service.port }}
+            - --timeout
+            - {{ .Values.django.gunicorn.timeout | quote }}
+            - --max-requests
+            - {{ .Values.django.gunicorn.maxRequests | quote }}
+            - --workers
+            - {{ .Values.django.gunicorn.workers | quote }}
+            - --threads
+            - {{ .Values.django.gunicorn.threads | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- include "qfieldcloud.djangoEnv" . | nindent 12 }}
+          {{- if .Values.startupProbe.enabled }}
+          startupProbe:
+            {{- omit .Values.startupProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            {{- omit .Values.livenessProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            {{- omit .Values.readinessProbe "enabled" | toYaml | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,363 @@
+# Default values for qfieldcloud
+replicaCount: 1
+
+image:
+  #repository: opengisch/qfieldcloud-app
+  #tag: latest
+  repository: qfieldcloud-opengisch
+  tag: web-docker
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Django application configuration
+django:
+  superuser:
+    enabled: true
+    username: admin
+    email: admin@example.com
+    password: qfieldcloud
+  gunicorn:
+    timeout: 120
+    maxRequests: 1000
+    workers: 4
+    threads: 2
+  settings:
+    debug: 1
+    environment: production
+    secretKey: "dev-secret-key-change-me-1234567890"  # Should be provided via secret
+    allowedHosts: "*"
+    settingsModule: "qfieldcloud.settings"
+    accountEmailVerification: "none"
+    useXForwardedHost: "0"
+    useI18n: 1
+    defaultLanguage: "en"
+    defaultTimeZone: "UTC"
+    authTokenExpirationHours: 24
+    passwordLoginDisabled: false
+    subscriptionModel: "subscription.Subscription"
+    workerQfieldcloudUrl: "http://qfieldcloud:8000/api/v1/"  # URL used by worker to communicate with the main app
+  sentry:
+    dsn: ""
+    release: ""
+    sampleRate: 0.1
+  email:
+    host: ""
+    useTls: true
+    useSsl: false
+    port: 587
+    hostUser: ""
+    hostPassword: ""  # Should be provided via secret
+    defaultFromEmail: "noreply@example.com"
+  storage:
+    type: "s3"  # local, s3, etc.
+    accessKeyId: "rustfsadmin"  # Default from env.example
+    secretAccessKey: "rustfsadmin"  # Default from env.example
+    bucketName: "qfieldcloud-local"  # Default from env.example
+    regionName: "us-east-1"  # Empty by default as in env.example
+    endpoint_url: "http://qfieldcloud-rustfs-svc:9000"  # Default from env.example
+    projectDefaultStorage: "default"  # Should match the storage backend name in STORAGES
+    minioApiPort: 8009  # Default from env.example
+    minioBrowserPort: 8010  # Default from env.example
+    storagesConfig:
+      default:
+        BACKEND: "qfieldcloud.filestorage.backend.QfcS3Boto3Storage"
+        OPTIONS:
+          access_key: "rustfsadmin"
+          secret_key: "rustfsadmin"
+          bucket_name: "qfieldcloud-local"
+          region_name: "us-east-1"
+          endpoint_url: "http://qfieldcloud-rustfs-svc:9000"
+          custom_domain: null
+          file_overwrite: false
+          object_parameters: {}
+          default_acl: "private"
+        QFC_IS_LEGACY: false
+
+# Database configuration
+database:
+  # External database configuration
+  external: False
+  host: "qfieldcloud-postgresql"
+  port: 5432
+  name: "qfieldcloud"
+  user: "qfieldcloud"
+  password: ""  # Should be provided via secret
+  sslMode: "prefer"
+
+# Geodatabase configuration
+geodatabase:
+  # External geodatabase configuration
+  external: true
+  host: ""
+  port: 5432
+  name: "qfieldcloud_geodb"
+  user: "qfieldcloud"
+  password: ""  # Should be provided via secret
+
+# QGIS configuration
+qgis:
+  image:
+    repository: opengisch/qfieldcloud-qgis
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  transformationGrids:
+    # If true, will download transformation grids as an init container
+    downloadOnStartup: true
+    # URL to download transformation grids from
+    sourceUrl: "https://cdn.proj.org/"
+
+# Worker configuration
+worker:
+  enabled: true
+  replicaCount: 1
+  image:
+    #repository: opengisch/qfieldcloud-app
+    #tag: latest
+    repository: qfieldcloud-opengisch
+    tag: worker-docker
+    pullPolicy: IfNotPresent
+    target: worker_wrapper_runtime  # Use the worker wrapper runtime that includes Docker client
+  executionMode: docker # docker | kubernetes
+  docker: #only for docker setup
+    network: kind #default ""
+    qfieldcloudNodePort: 30080
+    qfieldcloudUrl: "http://172.18.0.2:30080/api/v1/"
+
+    storageNodePort: 30900
+    storageEndpoint: "http://172.18.0.2:30900"
+    socket:
+      enabled: true
+      path: /var/run/docker.sock
+      groupId: 1001
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  env:
+    #QFIELDCLOUD_HOST: "http://qfieldcloud"
+    #SALT_KEY: "test123"
+    #DJANGO_USE_X_FORWARDED_HOST: "0"
+
+# Memcached configuration
+memcached:
+  enabled: true
+  serviceName: memcached
+  image:
+    repository: memcached
+    tag: "1"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Cron jobs configuration
+cronJobs:
+  enabled: true
+  image:
+    #repository: opengisch/qfieldcloud-app
+    #tag: latest
+    repository: qfieldcloud-opengisch
+    tag: web-docker
+    pullPolicy: IfNotPresent
+  schedule: "@every 1m"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+  nodePort: 30080
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+# Resource configuration
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+livenessProbe:
+  enabled: true
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /api/v1/status/
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /api/v1/status/
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+
+# Pod configuration
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Persistent volume configuration
+persistence:
+  shared:
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: ""
+    mountPath: /io
+
+  transformationGrids:
+    enabled: true
+    size: 1Gi
+    accessMode: ReadWriteOnce
+    storageClass: ""  # Use default storage class if empty
+
+serviceAccount:
+  create: true
+  name: "" 
+
+rustfs:
+  enabled: true
+  bucketName: "qfieldcloud-local"
+  replicaCount: 1
+
+  service:
+    type: NodePort
+    endpoint:
+      port: 9000
+      nodePort: 30900
+    console:
+      port: 9001
+      nodePort: 32001
+      
+  storageclass:
+    name: standard
+    dataStorageSize: 1Gi
+    logStorageSize: 1Gi
+
+  config:
+    rustfs:
+      volumes: "/data"
+
+postgresql:
+  enabled: true
+
+  auth:
+    username: qfieldcloud
+    password: qfieldcloud
+    database: qfieldcloud
+
+  primary:
+    initdb:
+      scripts:
+        01-postgis.sql: |
+          CREATE EXTENSION IF NOT EXISTS postgis;
+    persistence:
+      enabled: false
+  
+  image:
+    registry: docker.io
+    repository: bitnami/postgresql
+    tag: latest
+
+env:
+  QFIELDCLOUD_ACCOUNT_ADAPTER: "qfieldcloud.core.adapters.AccountAdapterSignUpOpen"
+  QFIELDCLOUD_HOST: qfield.field.localhost
+  #QFIELDCLOUD_WORKER_QFIELDCLOUD_URL: "http://qfieldcloud:8000/api/v1/"
+  QFIELDCLOUD_QGIS3_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
+  QFIELDCLOUD_QGIS4_IMAGE_NAME: "opengisch/qfieldcloud-qgis:latest"
+  QFIELDCLOUD_DRF_BROWSERABLE_API_RENDERER_ENABLED: "0"
+  QFIELDCLOUD_WORKER_SDK_CONNECT_TIMEOUT_S: "10"
+  QFIELDCLOUD_WORKER_SDK_READ_TIMEOUT_S: "300"
+  QFC_K8S_NAMESPACE: "default"
+  QFC_K8S_JOB_BACKOFF_LIMIT: "0"
+  QFC_K8S_JOB_TIMEOUT_SECONDS: "3600"
+  QFC_K8S_CPU_REQUEST: "500m"
+  QFC_K8S_CPU_LIMIT: "1000m"
+  QFC_K8S_MEMORY_REQUEST: "512Mi"
+  QFC_K8S_MEMORY_LIMIT: "1Gi"
+  QFC_SHARED_PVC_NAME: "qfieldcloud-shared"
+  #SALT_KEY: 0123456789abcdefghijklmnopqrstuvwxyz
+  COMPOSE_PROJECT_NAME: qfieldcloud
+  QFIELDCLOUD_TRANSFORMATION_GRIDS_VOLUME_NAME: "transformation-grids-qfieldcloud-worker-0"
+  EMAIL_HOST: mail
+  EMAIL_USE_TLS: "False"
+  EMAIL_USE_SSL: "False"
+  EMAIL_PORT: 1025
+  EMAIL_HOST_USER: ""
+  EMAIL_HOST_PASSWORD: ""
+  DEFAULT_FROM_EMAIL: noreply@field.localhost
+  ACCOUNT_RATE_LIMITS: >-
+    {
+      "reset_password": "20/m/ip,2/m/key",
+      "reset_password_from_key": "2/m/ip",
+      "confirm_email": "1/3m/key"
+    }
+  QFIELDCLOUD_WORKER_TIMEOUT_S: "600"
+  QFIELDCLOUD_WORKER_DEQUEUE_INTERVAL_S: "5"
+  #POSTGRES_USER: fieldtm
+  #POSTGRES_PASSWORD: fieldtm
+  #POSTGRES_DB: fieldtm
+  #POSTGRES_HOST: qfield-db
+  #POSTGRES_PORT: 5432
+  #POSTGRES_SSLMODE: prefer
+  #SECRET_KEY: YKuuTCb256dMmcg4DxpxrCafrcVvk8s3ZJrtDr9JaVAkeLiULGiemyzUTQESrzPQhiYUfn
+
+  QFIELDCLOUD_PASSWORD_LOGIN_IS_ENABLED: 1
+  QFIELDCLOUD_ADMIN_URI: admin/
+  CORS_ALLOWED_ORIGINS: "http://qfield.field.localhost,http://qfield.field.localhost:7050"
+  CORS_ALLOW_CREDENTIALS: 1
+#env:
+#  QFIELDCLOUD_HOST: "http://qfieldcloud"
+#  SALT_KEY:
+#    valueFrom:
+#      secretKeyRef:
+#        name: qfieldcloud-secrets
+#        key: SALT_KEY

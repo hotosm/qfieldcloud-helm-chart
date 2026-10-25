@@ -1,0 +1,34 @@
+{{- if .Values.cronJobs.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "qfieldcloud.fullname" . }}-cron
+  labels:
+    {{- include "qfieldcloud.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cron
+spec:
+  schedule: {{ .Values.cronJobs.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "qfieldcloud.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cron
+        spec:
+          serviceAccountName: {{ include "qfieldcloud.serviceAccountName" . }}
+          containers:
+            - name: cron
+              image: {{ include "qfieldcloud.image" (dict "ctx" . "image" .Values.cronJobs.image) | quote }}
+              imagePullPolicy: {{ .Values.cronJobs.image.pullPolicy }}
+              command:
+                - python
+                - manage.py
+                - runcrons
+              env:
+                {{- include "qfieldcloud.djangoEnv" . | nindent 16 }}
+              resources:
+                {{- toYaml .Values.cronJobs.resources | nindent 16 }}
+          restartPolicy: OnFailure
+{{- end }}
