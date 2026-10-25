@@ -1,0 +1,41 @@
+{{- if .Values.rustfs.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "qfieldcloud.fullname" . }}-rustfs-bucket-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-bucket
+          image: rustfs/rc:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              rc alias set rustfs \
+                http://qfieldcloud-rustfs-svc:9000 \
+                "$RUSTFS_ACCESS_KEY" \
+                "$RUSTFS_SECRET_KEY"
+
+              rc bucket create --ignore-existing \
+                rustfs/{{ .Values.rustfs.bucketName }}
+          env:
+            - name: RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qfieldcloud-rustfs-secret
+                  key: RUSTFS_ACCESS_KEY
+
+            - name: RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: qfieldcloud-rustfs-secret
+                  key: RUSTFS_SECRET_KEY
+{{- end }}

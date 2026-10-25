@@ -126,7 +126,7 @@ worker:
     tag: worker-docker
     pullPolicy: IfNotPresent
     target: worker_wrapper_runtime  # Use the worker wrapper runtime that includes Docker client
-  executionMode: docker  # docker | kubernetes
+  executionMode: kubernetes  # docker | kubernetes
   docker: #only for docker setup
     network: kind #default ""
     qfieldcloudNodePort: 30080
@@ -264,6 +264,8 @@ serviceAccount:
   name: "" 
 
 rustfs:
+  enabled: true
+  bucketName: "qfieldcloud-local"
   replicaCount: 1
 
   service:
